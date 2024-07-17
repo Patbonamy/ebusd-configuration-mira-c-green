@@ -1,0 +1,87 @@
+diff --git a/contrib/etc/ebusd/mqtt-hassio.cfg b/contrib/etc/ebusd/mqtt-hassio.cfg
+index 46d770ef..4024bbba 100644
+--- a/contrib/etc/ebusd/mqtt-hassio.cfg
++++ b/contrib/etc/ebusd/mqtt-hassio.cfg
+@@ -100,14 +100,15 @@ filter-seen = 5
+ # include only messages having a priority less than or equal to the specified value.
+ #filter-priority =
+ # include only messages having the specified circuit (partial match, alternatives and wildcard supported).
+-#filter-circuit =
++filter-circuit = boiler|dhw
+ # exclude messages having the specified circuit (partial match, alternatives and wildcard supported).
+ #filter-non-circuit =
+ # include only messages having the specified name (partial match, alternatives and wildcard supported).
+ # HA integration: filter to some useful names for monitoring the heating circuit
+-filter-name = status|temp|humidity|yield|count|energy|power|runtime|hours|starts|mode|curve|^load$|^party$|sensor|timer
++#filter-name = status|temp|humidity|yield|count|energy|power|runtime|hours|starts|mode|curve|^load$|^party$|sensor|timer
++filter-name = status|temp|count|mode|curve|z1|dhw|heat|time
+ # exclude messages having the specified name (partial match, alternatives and wildcard supported).
+-#filter-non-name =
++filter-non-name = ^heat_request_|^hot_water_target_temp_|^thermoregulation_|^heat_temp_ranges_|^dump_zones_|^timer_prog_|^boiler_life_time$
+ # include only messages having the specified level (partial match, alternatives and wildcard supported).
+ # Note: This is a filter on top of the messages already filtered implicitly for the ebusd "mqtt" user (if any).
+ # Note: Since the empty string matches all levels, an explicit check for empty string (with "^$") needs to be used for
+@@ -115,9 +116,9 @@ filter-name = status|temp|yield|count|energy|power|runtime|hours|starts|mode|cur
+ filter-level = ^$
+ # include only messages having the specified direction ("r", "w", "u", or "uw". partial match, alternatives and wildcard supported).
+ # HA integration: writable messages excluded for now
+-filter-direction = r|u
++#filter-direction = r|u
+ # HA integration: for including writable messages, use this line or overwrite with '--mqttvar=filter-direction=r|u|^w'.
+-#filter-direction = r|u|^w
++filter-direction = r|u|^w
+ # include only fields having the specified name (partial match, alternatives and wildcard supported).
+ #filter-field =
+ # exclude fields having the specified name (partial match, alternatives and wildcard supported).
+@@ -179,7 +180,9 @@ type_switch-w-number =
+     number,pressure, = bar$
+     number,gas, = gas*/min$
+     number,humidity, = humid*%%$
++    number,, = s|min$
+     number,, = curve,
++    number,, = slope
+
+ # HA integration: the mapping list for numeric sensor entities by field type, name, message, and unit.
+ type_switch-number =
+@@ -195,6 +198,9 @@ type_switch-number =
+     sensor,yield,total_increasing = total*,Wh$
+     sensor,,total_increasing = hours|,h$
+     sensor,,total_increasing = starts*,$
++    sensor,,total_increasing = count*,$
++    sensor,time,total_increasing = life_time|,min$
++    sensor,time,measurement = boost_time|,s$
+     sensor,pressure,measurement = bar$
+     sensor,gas,measurement = gas*/min$
+     sensor,humidity,measurement = humid*%%$
+@@ -328,7 +334,8 @@ definition-topic ?= %haprefix/%type_topic/%{TOPIC}_%FIELD/config
+ # HA integration: this is the config topic payload for HA's MQTT discovery.
+ definition-payload = {
+   "unique_id":"%{TOPIC}_%FIELD",
+-  "name":"%name %fieldname",
++  "name":"%messagecomment %comment",
++  "friendly_name":"%messagecomment %comment",
+   "device":%circuit_part,
+   "value_template":"{{value_json[\"%field\"].value}}",
+   "state_topic":"%topic"%field_payload
+@@ -357,7 +364,7 @@ global_prefix = {
+   "unique_id":"%TOPIC",
+   "device":%global_device,
+   "state_topic":"%topic",
+-  "name":"global %name"
++  "name":"%name"
+
+ # HA integration: boolean suffix for global parts
+ global_boolean_suffix = ,
+@@ -374,6 +381,12 @@ def_global-payload = %global_prefix
+ #def_global-retain = 0
+
+ # individual global running, version, signal, uptime, updatecheck, and scan config topic, payload, and retain setting.
++# Force expected value to be a string & strip quotes
++# expected values : finished, running, OK
++def_global_scan-payload = %global_prefix,
++  "value_template":"{{ value_json|replace('\"', '') }}"
++ }
++
+ def_global_running-topic = %haprefix/binary_sensor/%TOPIC/config
+ def_global_running-payload = %global_prefix,
+   "device_class":"running"%global_boolean_suffix
